@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import logger from "./middleware/logger.js";
 import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
+import taskRoutes from "./routes/task.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 // Load environment variables
@@ -23,6 +24,7 @@ app.use(logger);
 // Routes
 app.use("/api/health", healthRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/tasks", taskRoutes);
 
 // 404 Handler
 app.use(notFound);
