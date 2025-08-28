@@ -1,24 +1,23 @@
 import mongoose from "mongoose";
 
-const taskSchema = new mongoose.Schema(
+const taskSchema = mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "Title is required"],
+      required: true,
     },
-    description: {
-      type: String,
-      required: [, "Description is required"],
-    },
+    description: String,
     status: {
       type: String,
       enum: ["pending", "in-progress", "completed"],
       default: "pending",
     },
-    dueDate: {
-      type: Date,
+    dueDate: Date,
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
-    user: {
+    user: {   
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
