@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import User from "../models/UserModel.js";
+import Task from "../models/TaskModel.js"; // Needed for ownership check
 
-// Protect routes
+// Protect routes - require valid JWT
 const protect = async (req, res, next) => {
   let token;
 
@@ -30,12 +32,45 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Admin middleware
-const admin = (req, res, next) => {
-  if (req.user && req.user.isAdmin) {
-    return next();
-  }
-  return res.status(403).json({ message: "Not authorized as admin" });
+// Role-based authorization
+const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res
+        .status(403)
+        .json({ message: `Role '${req.user.role}' not authorized` });
+    }
+    next();
+  };
 };
 
-export { protect, admin };
+// Ownership / Assignee check
+const isOwnerOrAssigned = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid task ID" });
+    }
+
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    const isCreator = task.createdBy.toString() === req.user._id.toString();
+    const isAssignee =
+      task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
+
+    if (!isCreator && !isAssignee) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to perform this action" });
+    }
+
+    req.task = task; // Attach for downstream use
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+export { protect, authorizeRoles, isOwnerOrAssigned };
