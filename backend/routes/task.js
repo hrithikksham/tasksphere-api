@@ -13,7 +13,7 @@ import {
   markComplete,
 } from "../controllers/taskController.js";
 
-import { protect, admin } from "../middleware/authMiddleware.js";
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import upload from "../middleware/uploadMiddleware.js"; // Multer config
 
 const router = express.Router();
@@ -22,7 +22,7 @@ const router = express.Router();
 router.post("/", protect, createTask);
 
 // Get all tasks (admin only)
-router.get("/", protect, admin, getTasks);
+router.get("/", protect, authorizeRoles("admin"), getTasks);
 
 // Get logged-in user's tasks
 router.get("/my", protect, getMyTasks);

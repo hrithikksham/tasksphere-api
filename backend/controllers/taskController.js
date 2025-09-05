@@ -1,11 +1,9 @@
 import Task from "../models/TaskModel.js";
 
-
 // ========== Create a Task ==========
 export const createTask = async (req, res) => {
   try {
     const { title, description, assignedTo } = req.body;
-
     const task = await Task.create({
       title,
       description,
@@ -13,7 +11,6 @@ export const createTask = async (req, res) => {
       assignedTo,
       status: "pending",
     });
-
     res.status(201).json(task);
   } catch (error) {
     res.status(500).json({ message: "Error creating task", error: error.message });

@@ -6,6 +6,7 @@ import logger from "./middleware/logger.js";
 import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import taskRoutes from "./routes/task.js";
+import dashboardRoutes from "./routes/dashboard.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 // Load environment variables
@@ -25,6 +26,7 @@ app.use(logger);
 app.use("/api/health", healthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // 404 Handler
 app.use(notFound);
@@ -35,5 +37,5 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 6000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Tasksphere API running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`🚀 Tasksphere API running in ${process.env.NODE_ENV}  on http://localhost:${PORT}`);
 });
