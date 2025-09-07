@@ -7,6 +7,7 @@ import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import taskRoutes from "./routes/task.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import notificationRoutes from "./routes/notifications.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 // Load environment variables
@@ -27,6 +28,8 @@ app.use("/api/health", healthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes); 
+
 
 // 404 Handler
 app.use(notFound);
