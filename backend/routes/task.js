@@ -11,6 +11,8 @@ import {
   deleteComment,
   markInProgress,
   markComplete,
+  bulkCreateTasks,
+  bulkDeleteTasks,
 } from "../controllers/taskController.js";
 
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
@@ -50,5 +52,11 @@ router.patch("/:id/in-progress", protect, markInProgress);
 
 // Mark task as completed
 router.patch("/:id/complete", protect, markComplete);
+
+// Bulk create tasks
+router.post("/bulk-create", protect, bulkCreateTasks);
+
+// Bulk delete tasks
+router.delete("/bulk-delete", protect, bulkDeleteTasks);
 
 export default router;

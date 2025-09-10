@@ -1,6 +1,9 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+
 import connectDB from "./config/db.js";
 import logger from "./middleware/logger.js";
 import healthRoutes from "./routes/health.js";
@@ -8,6 +11,7 @@ import userRoutes from "./routes/users.js";
 import taskRoutes from "./routes/task.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import notificationRoutes from "./routes/notifications.js";
+import logRoutes from "./routes/log.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 // Load environment variables
@@ -23,12 +27,24 @@ app.use(cors());
 app.use(express.json());
 app.use(logger);
 
+// Helmet → secure HTTP headers
+app.use(helmet());
+
+// Rate limit login endpoint
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 5, // 5 attempts
+  message: { message: "Too many login attempts, try again later" },
+});
+
 // Routes
+app.use("/api/users/login", loginLimiter);
 app.use("/api/health", healthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes); 
+app.use("/api/logs", logRoutes);
 
 
 // 404 Handler
@@ -42,3 +58,6 @@ const PORT = process.env.PORT || 6000;
 app.listen(PORT, () => {
   console.log(`🚀 Tasksphere API running in ${process.env.NODE_ENV}  on http://localhost:${PORT}`);
 });
+
+
+

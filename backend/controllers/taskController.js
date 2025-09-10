@@ -1,16 +1,33 @@
 import Task from "../models/TaskModel.js";
+import Notification from "../models/NotificationModel.js";
+import { logActivity } from "../../middleware/logActivity.js";
 
 // ========== Create a Task ==========
 export const createTask = async (req, res) => {
   try {
-    const { title, description, assignedTo } = req.body;
+    const { title, description, assignedTo, dueDate } = req.body;
     const task = await Task.create({
       title,
       description,
       createdBy: req.user._id,
       assignedTo,
+      dueDate,
       status: "pending",
     });
+
+    // 🔔 Create notification for assigned user
+    if (assignedTo) {
+      await Notification.create({
+        user: assignedTo,
+        message: `You have been assigned a new task: ${title}`,
+      });
+    }
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "create", "Task", task._id, {
+      title: task.title,
+    });
+
     res.status(201).json(task);
   } catch (error) {
     res.status(500).json({ message: "Error creating task", error: error.message });
@@ -62,6 +79,19 @@ export const updateTask = async (req, res) => {
     Object.assign(task, req.body);
     await task.save();
 
+    // 🔔 Notify assigned user if reassigned
+    if (req.body.assignedTo && req.body.assignedTo !== task.assignedTo?.toString()) {
+      await Notification.create({
+        user: req.body.assignedTo,
+        message: `A task has been assigned to you: ${task.title}`,
+      });
+    }
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "update", "Task", task._id, {
+      updates: req.body,
+    });
+
     res.json(task);
   } catch (error) {
     res.status(500).json({ message: "Error updating task", error: error.message });
@@ -83,6 +113,12 @@ export const deleteTask = async (req, res) => {
     }
 
     await task.deleteOne();
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "delete", "Task", task._id, {
+      title: task.title,
+    });
+
     res.json({ message: "Task deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting task", error: error.message });
@@ -114,6 +150,11 @@ export const uploadAttachment = async (req, res) => {
     task.attachments.push(req.file.path);
     await task.save();
 
+    // 📝 Log activity
+    await logActivity(req.user._id, "upload", "Task", task._id, {
+      file: req.file.path,
+    });
+
     res.json({ message: "File uploaded", attachments: task.attachments });
   } catch (error) {
     res.status(500).json({ message: "Error uploading file", error: error.message });
@@ -134,6 +175,19 @@ export const addComment = async (req, res) => {
 
     task.comments.push(comment);
     await task.save();
+
+    // 🔔 Notify task creator if someone else comments
+    if (task.createdBy.toString() !== req.user._id.toString()) {
+      await Notification.create({
+        user: task.createdBy,
+        message: `New comment on your task "${task.title}"`,
+      });
+    }
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "comment", "Task", task._id, {
+      comment: req.body.text,
+    });
 
     res.json(task.comments);
   } catch (error) {
@@ -163,6 +217,11 @@ export const deleteComment = async (req, res) => {
     comment.remove();
     await task.save();
 
+    // 📝 Log activity
+    await logActivity(req.user._id, "delete-comment", "Task", task._id, {
+      commentId,
+    });
+
     res.json({ message: "Comment deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting comment", error: error.message });
@@ -183,6 +242,19 @@ export const markInProgress = async (req, res) => {
 
     task.status = "in-progress";
     await task.save();
+
+    // 🔔 Notify assigned user
+    if (task.assignedTo) {
+      await Notification.create({
+        user: task.assignedTo,
+        message: `Task "${task.title}" is now in progress`,
+      });
+    }
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "status-change", "Task", task._id, {
+      status: "in-progress",
+    });
 
     res.json(task);
   } catch (error) {
@@ -205,8 +277,56 @@ export const markComplete = async (req, res) => {
     task.status = "completed";
     await task.save();
 
+    // 🔔 Notify assigned user
+    if (task.assignedTo) {
+      await Notification.create({
+        user: task.assignedTo,
+        message: `Task "${task.title}" has been completed`,
+      });
+    }
+
+    // 📝 Log activity
+    await logActivity(req.user._id, "status-change", "Task", task._id, {
+      status: "completed",
+    });
+
     res.json(task);
   } catch (error) {
     res.status(500).json({ message: "Error updating status", error: error.message });
   }
 };
+
+// Bulk create tasks
+export const bulkCreateTasks = async (req, res) => {
+  try {
+    const tasks = req.body.tasks; // Array of tasks [{title, description, ...}]
+    if (!tasks || !Array.isArray(tasks)) {
+      return res.status(400).json({ message: "Tasks should be an array" });
+    }
+
+    const createdTasks = await Task.insertMany(
+      tasks.map((t) => ({ ...t, createdBy: req.user._id }))
+    );
+
+    res.status(201).json(createdTasks);
+  } catch (error) {
+    res.status(500).json({ message: "Bulk create failed", error: error.message });
+  }
+};
+
+// Bulk delete tasks
+export const bulkDeleteTasks = async (req, res) => {
+  try {
+    const { ids } = req.body; // Array of task IDs
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "IDs should be an array" });
+    }
+
+    const result = await Task.deleteMany({ _id: { $in: ids } });
+
+    res.status(200).json({ message: "Tasks deleted", deletedCount: result.deletedCount });
+  } catch (error) {
+    res.status(500).json({ message: "Bulk delete failed", error: error.message });
+  }
+};
+

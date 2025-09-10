@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../models/UserModel.js";
 
 /**
@@ -15,7 +16,7 @@ const generateToken = (id) => {
  * @route   POST /api/users
  * @access  Public
  */
-const registerUser = async (req, res) => {
+export const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
@@ -52,7 +53,7 @@ const registerUser = async (req, res) => {
  * @route   POST /api/users/login
  * @access  Public
  */
-const loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -81,7 +82,7 @@ const loginUser = async (req, res) => {
  * @route   GET /api/users
  * @access  Private/Admin
  */
-const getUsers = async (req, res) => {
+export const getUsers = async (req, res) => {
   try {
     const users = await User.find({}).select("-password");
     res.status(200).json(users);
@@ -95,7 +96,7 @@ const getUsers = async (req, res) => {
  * @route   GET /api/users/me
  * @access  Private
  */
-const getMe = async (req, res) => {
+export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
     if (!user) {
@@ -107,4 +108,103 @@ const getMe = async (req, res) => {
   }
 };
 
-export { registerUser, loginUser, getUsers, getMe };
+// Update profile
+export const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("+password");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const { name, email, oldPassword, newPassword } = req.body;
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+
+    if (newPassword) {
+      const isMatch = await user.matchPassword(oldPassword || "");
+      if (!isMatch) {
+        return res.status(400).json({ message: "Old password is incorrect" });
+      }
+      user.password = newPassword;
+    }
+
+    const updatedUser = await user.save();
+    res.status(200).json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Update failed", error: error.message });
+  }
+};
+
+// Upload avatar
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.avatar = `/uploads/avatars/${req.file.filename}`;
+    await user.save();
+
+    res.status(200).json({ message: "Avatar uploaded", avatar: user.avatar });
+  } catch (error) {
+    res.status(500).json({ message: "Avatar upload failed", error: error.message });
+  }
+};
+
+// Forgot password → generate token
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 min
+    await user.save();
+
+    // Simulate email by returning token in response
+    res.status(200).json({
+      message: "Password reset token generated",
+      resetToken, // 🔥 in real app, send via email
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to generate reset token", error: error.message });
+  }
+};
+
+// Reset password → validate token
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    }).select("+password");
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to reset password", error: error.message });
+  }
+};
