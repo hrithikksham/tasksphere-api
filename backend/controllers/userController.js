@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/userModel.js";
 
+
 /**
  * Helper function to generate JWT
  */
