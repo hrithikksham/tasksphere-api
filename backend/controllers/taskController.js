@@ -1,11 +1,14 @@
+// backend/controllers/taskController.js
 import Task from "../models/TaskModel.js";
 import Notification from "../models/NotificationModel.js";
-import { logActivity } from "../../middleware/logActivity.js";
+import { logActivity } from "../middleware/logActivityMiddleware.js";
+
 
 // ========== Create a Task ==========
 export const createTask = async (req, res) => {
   try {
     const { title, description, assignedTo, dueDate } = req.body;
+
     const task = await Task.create({
       title,
       description,
@@ -15,7 +18,7 @@ export const createTask = async (req, res) => {
       status: "pending",
     });
 
-    // 🔔 Create notification for assigned user
+    // 🔔 Notify assigned user
     if (assignedTo) {
       await Notification.create({
         user: assignedTo,
@@ -24,9 +27,7 @@ export const createTask = async (req, res) => {
     }
 
     // 📝 Log activity
-    await logActivity(req.user._id, "create", "Task", task._id, {
-      title: task.title,
-    });
+    await logActivity(req.user._id, "create", "Task", task._id, { title: task.title });
 
     res.status(201).json(task);
   } catch (error) {
@@ -40,6 +41,7 @@ export const getTasks = async (req, res) => {
     const tasks = await Task.find()
       .populate("createdBy", "name email")
       .populate("assignedTo", "name email");
+
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: "Error fetching tasks", error: error.message });
@@ -68,7 +70,7 @@ export const updateTask = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    // Only creator or admin can update
+    // Authorization check
     if (
       task.createdBy.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
@@ -76,11 +78,12 @@ export const updateTask = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to update this task" });
     }
 
+    const prevAssignedTo = task.assignedTo?.toString();
     Object.assign(task, req.body);
     await task.save();
 
-    // 🔔 Notify assigned user if reassigned
-    if (req.body.assignedTo && req.body.assignedTo !== task.assignedTo?.toString()) {
+    // 🔔 Notify if reassigned
+    if (req.body.assignedTo && req.body.assignedTo !== prevAssignedTo) {
       await Notification.create({
         user: req.body.assignedTo,
         message: `A task has been assigned to you: ${task.title}`,
@@ -88,9 +91,7 @@ export const updateTask = async (req, res) => {
     }
 
     // 📝 Log activity
-    await logActivity(req.user._id, "update", "Task", task._id, {
-      updates: req.body,
-    });
+    await logActivity(req.user._id, "update", "Task", task._id, { updates: req.body });
 
     res.json(task);
   } catch (error) {
@@ -104,7 +105,6 @@ export const deleteTask = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    // Only creator or admin can delete
     if (
       task.createdBy.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
@@ -114,10 +114,7 @@ export const deleteTask = async (req, res) => {
 
     await task.deleteOne();
 
-    // 📝 Log activity
-    await logActivity(req.user._id, "delete", "Task", task._id, {
-      title: task.title,
-    });
+    await logActivity(req.user._id, "delete", "Task", task._id, { title: task.title });
 
     res.json({ message: "Task deleted successfully" });
   } catch (error) {
@@ -131,6 +128,7 @@ export const getMyTasks = async (req, res) => {
     const tasks = await Task.find({
       $or: [{ createdBy: req.user._id }, { assignedTo: req.user._id }],
     });
+
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: "Error fetching my tasks", error: error.message });
@@ -143,17 +141,12 @@ export const uploadAttachment = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     task.attachments.push(req.file.path);
     await task.save();
 
-    // 📝 Log activity
-    await logActivity(req.user._id, "upload", "Task", task._id, {
-      file: req.file.path,
-    });
+    await logActivity(req.user._id, "upload", "Task", task._id, { file: req.file.path });
 
     res.json({ message: "File uploaded", attachments: task.attachments });
   } catch (error) {
@@ -176,7 +169,6 @@ export const addComment = async (req, res) => {
     task.comments.push(comment);
     await task.save();
 
-    // 🔔 Notify task creator if someone else comments
     if (task.createdBy.toString() !== req.user._id.toString()) {
       await Notification.create({
         user: task.createdBy,
@@ -184,7 +176,6 @@ export const addComment = async (req, res) => {
       });
     }
 
-    // 📝 Log activity
     await logActivity(req.user._id, "comment", "Task", task._id, {
       comment: req.body.text,
     });
@@ -206,7 +197,6 @@ export const deleteComment = async (req, res) => {
     const comment = task.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    // Only comment owner or admin can delete
     if (
       comment.postedBy.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
@@ -217,10 +207,7 @@ export const deleteComment = async (req, res) => {
     comment.remove();
     await task.save();
 
-    // 📝 Log activity
-    await logActivity(req.user._id, "delete-comment", "Task", task._id, {
-      commentId,
-    });
+    await logActivity(req.user._id, "delete-comment", "Task", task._id, { commentId });
 
     res.json({ message: "Comment deleted successfully" });
   } catch (error) {
@@ -235,15 +222,12 @@ export const markInProgress = async (req, res) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     if (task.status !== "pending") {
-      return res
-        .status(400)
-        .json({ message: "Only pending tasks can be marked in progress" });
+      return res.status(400).json({ message: "Only pending tasks can be marked in progress" });
     }
 
     task.status = "in-progress";
     await task.save();
 
-    // 🔔 Notify assigned user
     if (task.assignedTo) {
       await Notification.create({
         user: task.assignedTo,
@@ -251,10 +235,7 @@ export const markInProgress = async (req, res) => {
       });
     }
 
-    // 📝 Log activity
-    await logActivity(req.user._id, "status-change", "Task", task._id, {
-      status: "in-progress",
-    });
+    await logActivity(req.user._id, "status-change", "Task", task._id, { status: "in-progress" });
 
     res.json(task);
   } catch (error) {
@@ -269,15 +250,12 @@ export const markComplete = async (req, res) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     if (task.status !== "in-progress") {
-      return res
-        .status(400)
-        .json({ message: "Only in-progress tasks can be marked complete" });
+      return res.status(400).json({ message: "Only in-progress tasks can be marked complete" });
     }
 
     task.status = "completed";
     await task.save();
 
-    // 🔔 Notify assigned user
     if (task.assignedTo) {
       await Notification.create({
         user: task.assignedTo,
@@ -285,10 +263,7 @@ export const markComplete = async (req, res) => {
       });
     }
 
-    // 📝 Log activity
-    await logActivity(req.user._id, "status-change", "Task", task._id, {
-      status: "completed",
-    });
+    await logActivity(req.user._id, "status-change", "Task", task._id, { status: "completed" });
 
     res.json(task);
   } catch (error) {
@@ -296,10 +271,10 @@ export const markComplete = async (req, res) => {
   }
 };
 
-// Bulk create tasks
+// ========== Bulk Create ==========
 export const bulkCreateTasks = async (req, res) => {
   try {
-    const tasks = req.body.tasks; // Array of tasks [{title, description, ...}]
+    const { tasks } = req.body;
     if (!tasks || !Array.isArray(tasks)) {
       return res.status(400).json({ message: "Tasks should be an array" });
     }
@@ -314,10 +289,10 @@ export const bulkCreateTasks = async (req, res) => {
   }
 };
 
-// Bulk delete tasks
+// ========== Bulk Delete ==========
 export const bulkDeleteTasks = async (req, res) => {
   try {
-    const { ids } = req.body; // Array of task IDs
+    const { ids } = req.body;
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "IDs should be an array" });
     }
@@ -329,4 +304,3 @@ export const bulkDeleteTasks = async (req, res) => {
     res.status(500).json({ message: "Bulk delete failed", error: error.message });
   }
 };
-

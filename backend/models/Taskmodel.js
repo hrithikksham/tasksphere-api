@@ -40,3 +40,51 @@ const taskSchema = new mongoose.Schema(
 
 const Task = mongoose.model("Task", taskSchema);
 export default Task;
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Task:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         title:
+ *           type: string
+ *         description:
+ *           type: string
+ *         status:
+ *           type: string
+ *           enum: [pending, in-progress, completed]
+ *         createdBy:
+ *           type: string
+ *         assignedTo:
+ *           type: string
+ *         dueDate:
+ *           type: string
+ *           format: date-time
+ *       example:
+ *         _id: 65bcd12345
+ *         title: Finish Swagger Docs
+ *         description: Add OpenAPI documentation for tasks
+ *         status: pending
+ *         createdBy: 65abc67890
+ *         assignedTo: 65xyz12345
+ *         dueDate: 2025-09-30T18:00:00Z
+ *
+ *     TaskInput:
+ *       type: object
+ *       required:
+ *         - title
+ *       properties:
+ *         title:
+ *           type: string
+ *         description:
+ *           type: string
+ *         assignedTo:
+ *           type: string
+ *         dueDate:
+ *           type: string
+ *           format: date-time
+ */
