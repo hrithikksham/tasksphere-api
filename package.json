@@ -2,11 +2,11 @@
   "name": "tasksphere-api",
   "version": "1.0.0",
   "description": "REST API for TaskSphere Task Management Application",
-  "main": "backend/server.js",
+  "main": "backend/index.js",
   "type": "module",
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js"
+    "start": "node backend/index.js",
+    "dev": "nodemon backend/index.js"
   },
 
   "author": "Full Stack Developer Intern",
