@@ -1,6 +1,6 @@
 // backend/controllers/taskController.js
-import Task from "../models/TaskModel.js";
-import Notification from "../models/NotificationModel.js";
+import Task from "../models/taskModel.js";
+import Notification from "../models/notificationModel.js";
 import { logActivity } from "../middleware/logActivityMiddleware.js";
 
 

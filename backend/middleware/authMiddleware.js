@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import User from "../models/UserModel.js";
-import Task from "../models/TaskModel.js"; 
+import User from "../models/userModel.js";
+import Task from "../models/taskModel.js"; 
 
 // Protect routes - require valid JWT
 const protect = async (req, res, next) => {
