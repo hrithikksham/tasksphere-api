@@ -1,6 +1,4 @@
 // backend/controllers/dashboardController.js
-import Task from "../models/TaskModel.js";
-import User from "../models/UserModel.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
